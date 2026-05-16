@@ -14,11 +14,6 @@ import os
 from datetime import datetime
 import json
 
-# ──── To do ───────────────────────────────────────────
-# -Verificar campos del formulario obligatorios
-# -Verificar valores ingresados en los campos númericos para evitar valores negativos
-# -Arreglar lo campos para mostrar información (Se corta la interfaz)
-
 # ──── Persistencia de contadores IDs autocrecientes ───
 idFile = 'IFN_counters.json'
 
