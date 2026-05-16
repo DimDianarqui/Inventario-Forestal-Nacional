@@ -12,8 +12,30 @@ import ipywidgets as widgets
 from IPython.display import display, clear_output
 import os
 from datetime import datetime
+import json
 
-# ────Estado global────────────────────────────────────
+# ──── To do ───────────────────────────────────────────
+# -Verificar campos del formulario obligatorios
+# -Verificar valores ingresados en los campos númericos para evitar valores negativos
+# -Arreglar lo campos para mostrar información (Se corta la interfaz)
+
+# ──── Persistencia de contadores IDs autocrecientes ───
+idFile = 'IFN_counters.json'
+
+def loadCounters():
+  if os.path.exists(idFile):
+    with open(idFile,'r') as f:
+      return json.load(f)
+  return {'lastVeg':1000,'lastAnimal':5000}
+
+def saveCounters(counters):
+  with open(idFile,'w') as f:
+    json.dump(counters,f)
+
+counters=loadCounters()
+# ──────────────────────────────────────────────────────
+
+# ──── Estado global────────────────────────────────────
 numBrigadaActual = 0
 
 # Creación de zonas para mostrar los datos/formularios
@@ -21,39 +43,33 @@ salidaForms = widgets.Output()
 startUpControls = widgets.Output()
 actionButtonsOutput = widgets.Output()
 
-numBrigadasInput = widgets.IntText(
-    value=1,
-    description='Número de brigadas:',
-    disabled=False
-)
-
 # ──── Boton inicial ────────────────────────────────────
 def showInputLogs(b):
   global numBrigadaActual,salidaForms,actionButtonsOutput
+
   numBrigadaActual = 0
 
-  salidaForms = widgets.Output()
+  salidaForms         = widgets.Output()
   actionButtonsOutput = widgets.Output()
 
   with startUpControls:
     clear_output(wait = True)
-    display(widgets.HBox([numBrigadasInput,log]))
+    display(startLog)
 
   display(salidaForms, actionButtonsOutput)
 
-log = widgets.Button(description="Confirmar",style={'button_color':"purple"})
+log = widgets.Button(description="Iniciar Registro",style={'button_color':'blue'})
+log.on_click(showInputLogs)
 
-
-startLog = widgets.Button(description="Iniciar Registro",style={'button_color':'blue'})
-startLog.on_click(showInputLogs)
-
-display(startLog,startUpControls)
+startLog = widgets.Button(description="Confirmar",style={'button_color':'purple'})
+startLog.on_click(logInfo)
+display(log,startUpControls)
 
 # ──── Lógica ────────────────────────────────────────────────
-def logInfo(num):
+def logInfo(b):
     global numBrigadaActual, salidaForms, actionButtonsOutput
 
-    numBrigadas = num.value
+    counters = loadCounters()
     numBrigadaActual = 0
     brigadasChoice = ["N/A",1,2,3]
     brigadas = []
@@ -65,108 +81,119 @@ def logInfo(num):
     with actionButtonsOutput:
      clear_output(wait = True)
 
-    for _i in range(numBrigadas):
-      brigadas.append("")
+    labelStyle = {'description_width':'130px'}
 
-    # ──── Guardar datos de un grupo ────────────────────────────
-    def saveData(number,brigade,zoneAsigned,nameVeg,typeVeg,useVeg,idVeg,nameAnimal,typeAnimal,idAnimal):
+    # ──── Formulario único ─────────────────────────────────
+    numBrigade = widgets.Dropdown(options=brigadasChoice,description="Brigada #:",style=labelStyle)
+
+    assignedZone = widgets.BoundedIntText(min=1,max=999,description="Conglomerado (#): ",style=labelStyle)
+
+    # ──── Datos especie vegetal de la zona ───────────────────────────────
+    commonNameVeg = widgets.Text(description="Nombre común: ", style=labelStyle)
+    typeVeg = widgets.Dropdown(description="Tipo de arbol: ",
+                                options=["N/A","Fustal","Latizal","Brinzal"], style=labelStyle)
+    useVeg = widgets.Dropdown(description="Uso del arbol: ",
+                              options=["N/A","Medicinal","Alimenticio","Maderable"], style=labelStyle)
+    idVeg = widgets.Label(value=f"Cód. Vegetal asignado: {counters['lastVeg']+1}")
+
+    # ──────────── Datos especie animal de la zona ────────────────────────
+    commonNameAnimal = widgets.Text(description="Nombre común: ", style=labelStyle,)
+    typeAnimal = widgets.Dropdown(description="Tipo de animal: ",
+                                  options=["N/A","Pez","Mamífero","Reptil","Ave","Anfibio"], style=labelStyle)
+    idAnimal = widgets.Label(value=f"Cód. Animal asignado: {counters['lastAnimal']+1}")
+
+    validationOutput = widgets.Output()
+
+    # ──── Validación de campos ────────────────────────────────────────────
+    def validateForm():
+      errors=[]
+      if numBrigade.value == "N/A":
+        errors.append("- Selecciona una brigada válida (No 'N/A').")
+      if not commonNameVeg.value.strip():
+        errors.append("- El nombre común de la especie vegetal está vacío.")
+      if typeVeg.value == "N/A":
+        errors.append("- Selecciona un Tipo de árbol válido (No 'N/A').")
+      if useVeg.value == "N/A":
+        errors.append("- Selecciona un Uso del árbol válido (No 'N/A').")
+      if not commonNameAnimal.value.strip():
+        errors.append("- El nombre común de la especie animal está vacío.")
+      if typeAnimal.value == "N/A":
+        errors.append("- Selecciona un Tipo de animal válido (No 'N/A').")
+      return errors
+    # ────────────────────────────────────────────────────────────────────────
+    # ──── Guardar registro validado ────────────────────────────────────────
+    def saveData(b):
+      global counters
+      errors = validateForm()
+
+      with validationOutput:
+        clear_output(wait=True)
+        if errors:
+          msg = "<b style='color:red'>⚠️ Corrige los siguientes campos antes de guardar:</b><br>"+"<br>".join(errors)
+          display(widgets.HTML(msg))
+          return
+
+      counters['lastVeg'] +=1
+      counters['lastAnimal'] +=1
+      saveCounters(counters)
+
       info=[
-          number,
-          brigade.value,
-          zoneAsigned.value,
-          nameVeg.value,
+          len(brigadas)+1,
+          numBrigade.value,
+          assignedZone.value,
+          commonNameVeg.value,
           typeVeg.value,
           useVeg.value,
-          idVeg.value,
-          nameAnimal.value,
+          counters['lastVeg'],
+          commonNameAnimal.value,
           typeAnimal.value,
-          idAnimal.value
+          counters['lastAnimal']
       ]
-      while len(brigadas) < number:
-          brigadas.append("")
-      brigadas[number-1] = info
+      brigadas.append(info)
+
+      # Actualizar label para el siguiente registro
+      idVeg.value = f"Cód. Vegetal asignado: {counters['lastVeg']+1}"
+      idAnimal.value = f"Cód. Animal asignado: {counters['lastAnimal']+1}"
+      # Limpiar formulario para el siguiente registro
+      numBrigade.value        = "N/A"
+      assignedZone.value      = 1
+      commonNameVeg.value     = ""
+      typeVeg.value           = "N/A"
+      useVeg.value            = "N/A"
+      commonNameAnimal.value  = ""
+      typeAnimal.value        = "N/A"
+
+      with validationOutput:
+        clear_output(wait=True)
+        display(widgets.HTML( f"<b style='color:lightgreen'>✅ Registro #{len(brigadas)} guardado — "
+                f"Cód. Vegetal: {counters['lastVeg']} | Cód. Animal: {counters['lastAnimal']}</b>"
+            ))
+
+    # ──── Fix Colab ────────────────────────────────────────────────────────────
+    def refreshOutput(b):
       with salidaForms:
-          print(f"¡Guardado Datos #{number}!✅")
+        print("Refrescado correctamente")
 
-    # ──── Eliminar datos de un grupo ────────────────────────────
-    def remove_data(number,brigadeList):
-      if 0 < number <= len(brigadeList) and isinstance(brigadeList[number-1],list):
-          brigadeList[number-1][0] = number
-          brigadeList[number-1][1] = "(Eliminado)"
-          for i in range(2,len(brigadeList[number-1])):
-            brigadeList[number-1][i] = "N/A"
-          msg = f"Datos #{number} eliminado correctamente🗑️"
-      else:
-          msg = f"No se pudo eliminar los datos #{number}. Número fuera de rango."
-      with salidaForms:
-          print(msg)
+    refreshBoton = widgets.Button(description="🔄Refrescar vista",style={'button_color':'gray'})
+    refreshBoton.on_click(refreshOutput)
 
+    saveBoton = widgets.Button(description="Revisar y guardar", style={'button_color':'green'})
+    saveBoton.on_click(saveData)
 
-    # ──── Crear formulario para grupo ────────────────────────────
-    def createNewDataset(data_number):
-      labelStyle = {'description_width':'130px'}
-
-      numBrigade = widgets.Dropdown(
-          options=brigadasChoice,
-          description="Brigada número: ",
-          style=labelStyle,
-          )
-      assignedZone = widgets.IntText(description="Conglomerado (#): ",style=labelStyle)
-      # ──── Datos especie vegetal de la zona ───────────────────────────────
-      commonNameVeg = widgets.Text(description="Nombre común: ",
-                                   style=labelStyle)
-      typeVeg = widgets.Dropdown(description="Tipo de arbol: ",
-                                 options=["N/A","Fustal","Latizal","Brinzal"],
-                                 style=labelStyle)
-      useVeg = widgets.Dropdown(description="Uso del arbol: ",
-                                options=["N/A","Medicinal","Alimenticio","Maderable"],
-                                style=labelStyle)
-      idVeg = widgets.IntText(description="Cod. ID: ",
-                              style=labelStyle)
-
-      # ──────────── Datos especie animal de la zona ────────────────────────
-      commonNameAnimal = widgets.Text(description="Nombre común: ",
-                                      style=labelStyle,)
-      typeAnimal = widgets.Dropdown(description="Tipo de animal: ",
-                                    options=["N/A","Pez","Mamífero","Reptil","Ave","Anfibio"],
-                                    style=labelStyle)
-      idAnimal = widgets.IntText(description="Cod. ID: ",
-                                 style=labelStyle)
-
-      # Funciones de guardado y mostrar los elementos
-      saveBoton = widgets.Button(description="guardar/editar", style={'button_color':'green'})
-      saveBoton.on_click(lambda b,
-                        number=data_number,
-                        brigade=numBrigade,
-                        zoneAsigned=assignedZone,
-                        nameVeg=commonNameVeg,
-                        typeVeg=typeVeg,
-                        useVeg=useVeg,
-                        idVeg=idVeg,
-                        nameAnimal=commonNameAnimal,
-                        typeAnimal=typeAnimal,
-                        idAnimal=idAnimal
-                        : saveData(number,brigade,zoneAsigned,nameVeg,typeVeg,useVeg,idVeg,nameAnimal,typeAnimal,idAnimal))
-
-      removeBoton = widgets.Button(description="eliminar", style={'button_color':'red'})
-      removeBoton.on_click(lambda b,
-                          number = data_number,
-                          brigadasList=brigadas
-                          : remove_data(number,brigadasList))
-
-      ui1      = widgets.HBox([numBrigade,assignedZone])
-      uiVeg    = widgets.VBox([commonNameVeg,typeVeg, useVeg,idVeg])
-      uiAnimal = widgets.VBox([commonNameAnimal,typeAnimal,idAnimal])
-      uiFuncs  = widgets.HBox([saveBoton,removeBoton])
-
-      with salidaForms:
-        print("-"*55)
-        print(f"\nDatos {data_number}")
-        display(ui1,
-                "-----Especie vegetal-----",uiVeg,
-                "-----Especie Animal-----",uiAnimal,
-                uiFuncs)
-
+    # ──── Generar formulario ───────────────────────────────────────────────────
+    ui1      = widgets.HBox([numBrigade,assignedZone])
+    uiVeg    = widgets.VBox([commonNameVeg,typeVeg, useVeg,idVeg])
+    uiAnimal = widgets.VBox([commonNameAnimal,typeAnimal,idAnimal])
+    with salidaForms:
+      display(refreshBoton,
+              widgets.HTML("<b>───────────────────────────────────────────────────</b>"),
+              ui1,
+              widgets.HTML("<b>-----Especie vegetal (Árbol)-----</b>"),uiVeg,
+              widgets.HTML("<b>-----Especie Animal-----</b>"),uiAnimal,
+              saveBoton,
+              validationOutput,
+              widgets.HTML("<b>───────────────────────────────────────────────────</b>")
+              )
 
     # ──── Convertir lista > Diccionario ────────────────────────────────
     def listToDict(brigadasList):
@@ -183,21 +210,23 @@ def logInfo(num):
             'Nombre Común Vegetal'  :i[3],
             'Tipo Especie Vegetal'  :i[4],
             'Uso de Especie Vegetal':i[5],
-            'ID Vegetal'            :i[6],
+            '# Vegetal'             :i[6],
             'Nombre Común Animal'   :i[7],
             'Tipo Animal'           :i[8],
-            'ID Animal'             :i[9]
+            '# Animal'              :i[9]
         })
       return result
 
     # ──── Guardar CSV ────────────────────────────────────────────────────
     def saveCSV():
+      from google.colab import files
+
       dataBrigadas = listToDict(brigadas)
       nameCSV = 'IFN_Datos_General.csv'
       header = ['Fecha Registro','Brigada #','Conglomerado',
                 'Nombre Común Vegetal','Tipo Especie Vegetal',
-                'Uso de Especie Vegetal','ID Vegetal',
-                'Nombre Común Animal','Tipo Animal','ID Animal']
+                'Uso de Especie Vegetal','# Vegetal',
+                'Nombre Común Animal','Tipo Animal','# Animal']
 
       fileExists= os.path.exists(nameCSV)
       with open(nameCSV, 'a', newline='', encoding='utf-8') as file:
@@ -206,8 +235,9 @@ def logInfo(num):
             if not fileExists:
               writer.writeheader()
             writer.writerows(dataBrigadas)
+      files.download(nameCSV)
       with salidaForms:
-          print(f"Información actual agregada con exito, guardado como {nameCSV}.")
+          print(f"Información actual agregada con exito, guardado como '{nameCSV}'.")
 
     # ──── Filtrar CSV por brigada ────────────────────────────────────────
     def filterBrigade():
@@ -237,6 +267,7 @@ def logInfo(num):
       filterOutput = widgets.Output()
 
       def filterCSV(b):
+        from google.colab import files
         selected = brigadeChoice.value
         filtered = [r for r in all_rows if r['Brigada #'] == selected]
         outName = f'IFN_Brigada_{selected}.csv'
@@ -246,7 +277,7 @@ def logInfo(num):
           writer = csv.DictWriter(f, fieldnames = header)
           writer.writeheader()
           writer.writerows(filtered)
-
+        files.download(outName)
         with filterOutput:
           clear_output(wait=True)
           print(f"Filtrado: {len(filtered)} registro(s) de Brigada {selected}✅")
@@ -259,22 +290,6 @@ def logInfo(num):
 
 
     # ──── Start Here ────────────────────────────────────────────────────
-    # ──── Crear formularios iniciales ────────────────────────────────────
-    for _i in range(0,numBrigadas):
-      numBrigadaActual += 1
-      createNewDataset(numBrigadaActual)
-
-    # ──── Boton para crear grupo ────────────────────────────────────────────
-    newData = widgets.Button(description="agregar grupo",style={'button_color':'orange'})
-
-    # ──── Boton para crear nuevo set de datos ────────────────────────────────
-    def addNewDataset(b):
-        global numBrigadaActual
-        numBrigadaActual += 1
-        createNewDataset(numBrigadaActual)
-    with salidaForms:
-      print("-"*55)
-    newData.on_click(addNewDataset)
 
     # ──── Botones de acción ────────────────────────────────────────────────
     saveCSVBoton = widgets.Button(description="guardar como CSV", style={'button_color':'purple'})
@@ -283,8 +298,9 @@ def logInfo(num):
     saveCSVBoton.on_click(lambda b: saveCSV())
     filterCSVBoton.on_click(lambda b: filterBrigade())
 
-    ui3 = widgets.HBox([newData,saveCSVBoton,filterCSVBoton])
+    ui3 = widgets.HBox([saveCSVBoton,filterCSVBoton])
     with actionButtonsOutput:
       display(ui3)
 
-log.on_click(lambda b: logInfo(numBrigadasInput))
+
+
