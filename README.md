@@ -1,165 +1,140 @@
-# 🌿 Inventario Forestal Nacional — Herramienta de Captura de Datos
+# 📋 IFN — Sistema de Registro de Inventario Forestal Nacional
 
-Herramienta interactiva desarrollada en Python (Jupyter/Google Colab) para el registro estructurado de datos de campo del **Inventario Forestal Nacional (IFN)**. Permite capturar, validar, exportar y filtrar información sobre especies vegetales y animales por brigada y conglomerado.
+Sistema interactivo de captura de datos para brigadas de campo del Inventario Forestal Nacional (IFN), desarrollado en Python con `ipywidgets` para Google Colab.
 
 ---
 
-## 📋 Descripción
+## 📌 Descripción general
 
-Este script genera un formulario interactivo dentro de un notebook de Jupyter o Google Colab, facilitando el ingreso de datos de campo sin necesidad de editar código. Incluye validación de campos obligatorios, IDs autocrecientes persistentes entre sesiones, y exportación directa a `.csv` con descarga automática al equipo.
+Este notebook permite registrar, validar, guardar y exportar información de campo recolectada por brigadas forestales. Cada registro asocia una brigada y conglomerado con una especie vegetal (árbol) y una especie animal observadas en la zona.
+
+Los datos se persisten localmente en archivos CSV y los contadores de IDs se mantienen entre sesiones mediante un archivo JSON.
+
+---
+
+## 🗂️ Archivos generados
+
+| Archivo | Descripción |
+|---|---|
+| `IFN_counters.json` | Persistencia de los últimos IDs asignados a vegetales y animales |
+| `IFN_Brigadas.csv` | Registro de brigadas creadas (número, líder y guía local) |
+| `IFN_Datos_General.csv` | Datos consolidados de todos los registros guardados |
+| `IFN_Brigada_<N>.csv` | Exportación filtrada por número de brigada |
 
 ---
 
 ## ⚙️ Requisitos
 
-- Python 3.7+
-- Jupyter Notebook o Google Colab
-- Librerías:
-  - `ipywidgets`
-  - `csv` *(biblioteca estándar)*
-  - `os` *(biblioteca estándar)*
-  - `datetime` *(biblioteca estándar)*
-  - `json` *(biblioteca estándar)*
-
-### Instalación de dependencias
+- Python 3.x
+- Google Colab (recomendado) o entorno Jupyter con soporte para `ipywidgets`
+- Librerías estándar: `csv`, `os`, `json`, `datetime`
+- Librería adicional: `ipywidgets`
 
 ```bash
 pip install ipywidgets
 ```
 
-> En Google Colab, `ipywidgets` ya viene preinstalado.
+> ⚠️ La función de descarga de archivos (`files.download`) depende de `google.colab` y solo funcionará en ese entorno.
 
 ---
 
-## 🚀 Uso
+## 🚀 Modo de uso
 
-1. Abre el archivo en **Google Colab**.
-2. Ejecuta la celda principal.
-3. Presiona **"Iniciar Registro"** para abrir el panel de captura.
-4. Presiona **"Confirmar"** para cargar el formulario.
-5. Llena los campos y presiona **"Revisar y guardar"** para validar y almacenar el registro.
-6. El formulario se limpia automáticamente para ingresar el siguiente registro.
+### 1. Iniciar el registro
 
-### 📝 Campos del formulario
+Al ejecutar el notebook aparecerá el botón **"Iniciar Registro"**. Al pulsarlo se muestra el botón **"Confirmar"**, que carga el formulario principal.
 
-| Campo | Tipo | Descripción |
-|---|---|---|
-| **Brigada #** | Desplegable | Número de brigada asignada |
-| **Conglomerado (#)** | Numérico (1–999) | Número del conglomerado, no permite negativos |
-| **Nombre Común (Vegetal)** | Texto | Nombre común de la especie vegetal |
-| **Tipo de árbol** | Desplegable | Fustal / Latizal / Brinzal |
-| **Uso del árbol** | Desplegable | Medicinal / Alimenticio / Maderable |
-| **Cód. Vegetal** | Etiqueta (auto) | Asignado automáticamente, rango 1001–4999 |
-| **Nombre Común (Animal)** | Texto | Nombre común de la especie animal |
-| **Tipo de animal** | Desplegable | Pez / Mamífero / Reptil / Ave / Anfibio |
-| **Cód. Animal** | Etiqueta (auto) | Asignado automáticamente, rango 5001+ |
+### 2. Crear una brigada (obligatorio antes del primer registro)
 
-### 🎛️ Botones disponibles
+Haz clic en el botón **"Crear brigada"** (naranja) e ingresa:
+- **# Brigada** — número entero entre 1 y 999
+- **Líder del equipo** — nombre del responsable
+- **Guía local** — nombre del guía de campo
 
-| Botón | Color | Función |
-|---|---|---|
-| `Iniciar Registro` | 🔵 Azul | Abre el panel y recrea los widgets desde cero |
-| `Confirmar` | 🟣 Morado | Carga el formulario de captura |
-| `Revisar y guardar` | 🟢 Verde | Valida los campos y guarda el registro en memoria |
-| `🔄 Refrescar vista` | ⚫ Gris | Fuerza el re-render de la interfaz si se corta |
-| `guardar como CSV` | 🟣 Morado | Exporta todos los registros y descarga el archivo |
-| `Filtrar CSV` | 🩵 Teal | Filtra el CSV existente por brigada y lo descarga |
+Pulsa **"Guardar brigada"** para registrarla en `IFN_Brigadas.csv`.
 
----
+### 3. Completar el formulario de registro
 
-## ✅ Validación de campos
+Campos requeridos:
 
-Al presionar **"Revisar y guardar"**, el sistema verifica que:
+**Datos generales**
+- `Brigada #` — seleccionar de la lista desplegable (no puede ser "N/A")
+- `Conglomerado (#)` — número entero entre 1 y 999
 
-- La brigada seleccionada no sea `N/A`
-- El nombre común de la especie vegetal no esté vacío
-- El tipo y uso del árbol no sean `N/A`
-- El nombre común de la especie animal no esté vacío
-- El tipo de animal no sea `N/A`
+**Especie vegetal (Árbol)**
+- `Nombre común` — texto libre
+- `Tipo de árbol` — Fustal / Latizal / Brinzal
+- `Uso del árbol` — Medicinal / Alimenticio / Maderable
+- `Cód. Vegetal asignado` — generado automáticamente (solo lectura)
 
-Si algún campo es inválido, se muestra un mensaje en **rojo** indicando cuáles deben corregirse. El registro **no se guarda** hasta que todos los campos sean válidos.
+**Especie animal**
+- `Nombre común` — texto libre
+- `Tipo de animal` — Pez / Mamífero / Reptil / Ave / Anfibio
+- `Cód. Animal asignado` — generado automáticamente (solo lectura)
 
----
+### 4. Guardar el registro
 
-## 🔢 IDs autocrecientes y persistentes
+Pulsa **"Revisar y guardar"** (verde). El sistema valida todos los campos y, si son correctos, guarda el registro en memoria y limpia el formulario para el siguiente ingreso.
 
-Los códigos de especie se asignan automáticamente y se guardan en `IFN_counters.json`:
+> Los IDs de vegetal y animal se incrementan automáticamente con cada guardado exitoso y se persisten en `IFN_counters.json`.
 
-- **Especie vegetal:** inicia en `1001`, incrementa con cada registro guardado
-- **Especie animal:** inicia en `5001`, incrementa con cada registro guardado
+### 5. Exportar los datos
 
-Al cerrar y volver a abrir el notebook, los contadores retoman desde el último valor guardado, evitando que se reinicien a cero.
+| Botón | Acción |
+|---|---|
+| **Guardar como CSV** (morado) | Agrega todos los registros de la sesión a `IFN_Datos_General.csv` y lo descarga |
+| **Filtrar CSV** (teal) | Permite seleccionar una brigada y descargar solo sus registros |
+
+### 6. Refrescar vista
+
+El botón **"🔄 Refrescar vista"** (gris) imprime un mensaje de confirmación en la zona de formularios. Útil para forzar la actualización visual en Colab.
 
 ---
 
-## 📁 Salida de datos
+## 🔢 Sistema de IDs automáticos
 
-### Archivo general
-Al hacer clic en **"guardar como CSV"**, se genera o actualiza el archivo y se descarga automáticamente:
-```
-IFN_Datos_General.csv
-```
+Los códigos se asignan de forma secuencial y persistente:
 
-### Archivo filtrado por brigada
-Al usar **"Filtrar CSV"** y seleccionar una brigada, se genera y descarga:
-```
-IFN_Brigada_<número>.csv
-```
+| Tipo | ID inicial |
+|---|---|
+| Vegetal | 1001 (parte de 1000) |
+| Animal | 5001 (parte de 5000) |
 
-Ambos archivos contienen las siguientes columnas:
-
-```
-Fecha Registro, Brigada #, Conglomerado, Nombre Común Vegetal,
-Tipo Especie Vegetal, Uso de Especie Vegetal, # Vegetal,
-Nombre Común Animal, Tipo Animal, # Animal
-```
-
-> Los registros se **agregan** al final del archivo general sin sobreescribir los anteriores.
+El archivo `IFN_counters.json` guarda el último ID utilizado. Si el archivo no existe, se inicializa con los valores base.
 
 ---
 
-## 🗂️ Estructura del código
+## ✅ Validaciones implementadas
 
-```
-inventarioforestalnacional.py
-│
-├── loadCounters()      — Lee los últimos IDs desde IFN_counters.json
-├── saveCounters()      — Guarda el estado de los contadores en JSON
-│
-├── showInputLogs()     — Inicializa la interfaz recreando los Output widgets
-├── logInfo()           — Lógica principal; contiene las funciones internas:
-│   ├── validateForm()      — Valida campos obligatorios y retorna lista de errores
-│   ├── saveData()          — Valida, incrementa IDs y guarda el registro en memoria
-│   ├── refreshOutput()     — Fuerza el re-render del Output widget (fix Colab)
-│   ├── listToDict()        — Convierte la lista de registros a formato diccionario
-│   ├── saveCSV()           — Exporta registros al CSV general y lo descarga
-│   └── filterBrigade()     — Filtra el CSV por brigada y descarga el resultado
-│
-└── Flujo principal
-    ├── "Iniciar Registro" → showInputLogs() → recrea widgets
-    ├── "Confirmar"        → logInfo()       → carga formulario
-    ├── "Revisar y guardar"→ saveData()      → valida y guarda
-    ├── "guardar como CSV" → saveCSV()       → exporta y descarga
-    └── "Filtrar CSV"      → filterBrigade() → filtra y descarga
-```
+### Registro de brigada
+- El número de brigada no debe estar ya registrado en `IFN_Brigadas.csv`
+- El nombre del líder no puede estar vacío
+- El nombre del guía no puede estar vacío
+
+### Registro de datos
+- La brigada seleccionada no puede ser "N/A"
+- El nombre común de la especie vegetal no puede estar vacío
+- El tipo de árbol no puede ser "N/A"
+- El uso del árbol no puede ser "N/A"
+- El nombre común de la especie animal no puede estar vacío
+- El tipo de animal no puede ser "N/A"
 
 ---
 
-## ⚠️ Limitaciones conocidas
+## 📐 Estructura del CSV principal (`IFN_Datos_General.csv`)
 
-- La lista de brigadas disponibles está fija en `["N/A", 1, 2, 3]`; debe ajustarse manualmente en el código si se requieren más.
-- El filtro por brigada requiere que `IFN_Datos_General.csv` exista previamente.
-- No hay verificación de registros duplicados al guardar en el CSV *(próxima actualización)*.
-- Los archivos se guardan en el directorio de trabajo temporal de Colab; la descarga automática los lleva al equipo local.
-
----
-
-## 🛠️ Próximas mejoras (To-do)
-
-- [ ] Verificación de registros duplicados al exportar al CSV
-- [ ] Registro dinámico de brigadas desde un CSV externo
-- [ ] Botón para visualizar los registros guardados en tabla antes de exportar
-- [ ] Exportación a formato Excel (`.xlsx`)
+| Campo | Descripción |
+|---|---|
+| `Fecha Registro` | Fecha en que se guardó el registro (`YYYY-MM-DD`) |
+| `Brigada #` | Número de brigada seleccionada |
+| `Conglomerado` | Número del conglomerado |
+| `Nombre Común Vegetal` | Nombre común de la especie vegetal |
+| `Tipo Especie Vegetal` | Clasificación del árbol |
+| `Uso de Especie Vegetal` | Uso principal del árbol |
+| `# Vegetal` | Código único asignado a la especie vegetal |
+| `Nombre Común Animal` | Nombre común de la especie animal |
+| `Tipo Animal` | Clasificación del animal |
+| `# Animal` | Código único asignado a la especie animal |
 
 ---
 
@@ -169,9 +144,3 @@ inventarioforestalnacional.py
 |---|---|
 | Diego Alejandro Durán Crispín | 01240372007 |
 | Diego Andrés Ardila Quintero | 01240372038 |
-
----
-
-## 📄 Licencia
-
-Uso interno — Inventario Forestal Nacional de Colombia.
